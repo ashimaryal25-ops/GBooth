@@ -1,0 +1,1333 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GBOOTH - Photobooth</title>
+
+    <!-- Add the QR code generator library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <style>
+      /* Reset defaults and fix the viewport size */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body,
+      html {
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      /* Forces background to dynamically scale edge-to-edge */
+      body {
+        background-color: #82c4f5; /* Fallback sky blue */
+        background-image: url("assets/gboothbackground.jpg");
+        background-size: 100% 100%;
+        background-position: center;
+        background-repeat: no-repeat;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      body:-webkit-full-screen {
+        width: 100vw;
+        height: 100vh;
+        background-size: 100% 100%;
+      }
+
+      body:fullscreen {
+        width: 100vw;
+        height: 100vh;
+        background-size: 100% 100%;
+      }
+
+      /* Base layout for page panels */
+      .view-panel {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+      }
+
+      /* Completely hides inactive view sections */
+      .hidden {
+        display: none !important;
+      }
+
+      /* Center vertical stack layout container */
+      .booth-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        width: 100%;
+        height: 100%;
+        padding: 0;
+      }
+
+      /* Persistent Bottom Logo Container */
+      .logo-container {
+        display: flex;
+        gap: 20px;
+        align-items: center;
+        justify-content: flex-start;
+        position: absolute;
+        bottom: 25px;
+        left: 40px;
+        z-index: 10;
+        pointer-events: none;
+      }
+
+      .logo {
+        height: 50px;
+        width: auto;
+        object-fit: contain;
+      }
+
+      /* Global Back Button Styling */
+      .back-btn {
+        position: absolute;
+        top: 30px;
+        left: 40px;
+        background: rgba(255, 255, 255, 0.25);
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        color: white;
+        padding: 10px 20px;
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+        font-weight: bold;
+        border-radius: 30px;
+        cursor: pointer;
+        z-index: 100;
+        backdrop-filter: blur(5px);
+        transition: all 0.2s ease;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      }
+
+      .back-btn:hover {
+        background: rgba(255, 255, 255, 0.4);
+        transform: translateX(-3px);
+      }
+
+      .back-btn:active {
+        transform: scale(0.95);
+      }
+
+      /* ==========================================
+       HOME SCREEN VIEW
+       ========================================== */
+      #view-home {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        height: 100%;
+        width: 100%;
+        margin-top: -30px;
+      }
+
+      .feed-window {
+        position: relative;
+        width: 420px;
+        height: 420px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .frame-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 5;
+        pointer-events: none;
+      }
+
+      #webcam {
+        width: 95%;
+        height: 95%;
+        object-fit: cover;
+        border-radius: 50px;
+        background-color: #111;
+        transform: scaleX(-1);
+      }
+
+      .start-button {
+        background: none;
+        border: none;
+        cursor: pointer;
+        position: relative;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        transition: transform 0.1s ease;
+      }
+
+      .start-button:active {
+        transform: scale(0.95);
+      }
+
+      .start-button img {
+        width: 280px;
+        height: auto;
+        display: block;
+      }
+
+      .button-text {
+        position: absolute;
+        color: #4a5d6e;
+        font-size: 22px;
+        font-family: "Courier New", Courier, monospace;
+        font-weight: bold;
+        letter-spacing: 2px;
+      }
+
+      .title-container {
+        margin-top: 5px;
+      }
+
+      .gbooth-title {
+        width: 340px;
+        height: auto;
+        object-fit: contain;
+      }
+
+      /* ==========================================
+       CHOOSE YOUR LAYOUT VIEW
+       ========================================== */
+      #view-layout {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding-top: 20px;
+        padding-bottom: 80px;
+      }
+
+      .layout-headline {
+        font-family: Arial, sans-serif;
+        font-size: 42px;
+        font-weight: 900;
+        color: #ffffff;
+        letter-spacing: 2px;
+        margin-bottom: 4px;
+        text-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+        text-transform: uppercase;
+      }
+
+      .layout-subheadline {
+        font-family: Arial, sans-serif;
+        font-size: 15px;
+        font-weight: bold;
+        color: rgba(255, 255, 255, 0.85);
+        margin-bottom: 40px;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      }
+
+      .layout-grid-fullscreen {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 60px;
+        width: 100%;
+        max-width: 1100px;
+        padding: 0 20px;
+      }
+
+      .layout-card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        cursor: pointer;
+        width: 220px;
+        transition: transform 0.25s ease;
+      }
+
+      .layout-card:hover {
+        transform: translateY(-12px);
+      }
+
+      .cut-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0;
+        margin-bottom: 20px;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+      }
+
+      .visual-strip-mock {
+        width: 110px;
+        height: 250px;
+        background-color: #ffffff;
+        border: 2px dashed #cbd5e1;
+        border-radius: 6px;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        gap: 8px;
+        box-shadow: 0 15px 30px rgba(0, 0, 0, 0.25);
+        transition: box-shadow 0.25s ease;
+      }
+
+      .layout-card:hover .visual-strip-mock {
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+      }
+
+      .mock-slot {
+        width: 100%;
+        background-color: #f1f5f9;
+        border-radius: 4px;
+        border: 1px solid #e2e8f0;
+      }
+
+      .slots-2 .mock-slot {
+        height: calc(50% - 4px);
+      }
+      .slots-3 .mock-slot {
+        height: calc(33.33% - 5.3px);
+      }
+      .slots-4 .mock-slot {
+        height: calc(25% - 6px);
+      }
+
+      .layout-label {
+        font-family: Arial, sans-serif;
+        color: #ffffff;
+        font-size: 18px;
+        font-weight: 900;
+        letter-spacing: 1px;
+        text-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+      }
+
+      .layout-sublabel {
+        font-family: Arial, sans-serif;
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 12px;
+        font-weight: bold;
+        margin-top: 4px;
+      }
+
+      /* ==========================================
+       CAMERA WORKSPACE STYLING
+       ========================================== */
+      .camera-workspace {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 50px;
+        width: 100%;
+        max-width: 1100px;
+        padding: 0 40px;
+      }
+
+      .camera-viewfinder {
+        position: relative;
+        width: 520px;
+        height: 590px;
+        background-color: #000000;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        overflow: hidden;
+      }
+
+      #booth-cam-stream {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transform: scaleX(-1);
+      }
+
+      #countdown-overlay {
+        position: absolute;
+        font-family: Arial, sans-serif;
+        font-size: 140px;
+        font-weight: 900;
+        color: #ffffff;
+        text-shadow:
+          0 0 25px rgba(0, 0, 0, 0.8),
+          0 0 50px #0022ff;
+        z-index: 10;
+        animation: pulseCount 1s infinite alternate;
+      }
+
+      @keyframes pulseCount {
+        0% {
+          transform: scale(0.95);
+          opacity: 0.9;
+        }
+        100% {
+          transform: scale(1.05);
+          opacity: 1;
+        }
+      }
+
+      .camera-sidebar {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 30px;
+        width: 480px;
+      }
+
+      #photo-preview-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+        width: 100%;
+        min-height: 340px;
+      }
+
+      .preview-box-slot {
+        background-image: url("assets/white square.png");
+        background-size: 100% 100%;
+        background-repeat: no-repeat;
+        aspect-ratio: 4 / 3;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+      }
+
+      .preview-box-slot canvas {
+        width: 90%;
+        height: 90%;
+        object-fit: cover;
+        transform: scaleX(-1);
+      }
+
+      .camera-action-controls {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 30px;
+        width: 100%;
+        height: 140px;
+      }
+
+      .cam-action-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        transition: transform 0.2s ease;
+      }
+
+      .cam-action-btn:hover {
+        transform: scale(1.08);
+      }
+      .cam-action-btn:active {
+        transform: scale(0.96);
+      }
+
+      .cam-action-btn img {
+        width: 140px;
+        height: auto;
+        display: block;
+      }
+
+      /* ==========================================
+       DECORATION INTERFACE STYLING
+       ========================================== */
+      #view-decor {
+        background-color: #82c4f5;
+        background-image: url("assets/gboothbackground.jpg");
+        background-size: 100% 100%;
+        background-position: center;
+        background-repeat: no-repeat;
+        position: relative;
+      }
+
+      .decor-workspace-grid {
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        gap: 50px;
+        width: 100%;
+        max-width: 1200px;
+        margin-top: 40px;
+        padding: 0 20px;
+      }
+
+      .decor-strip-area {
+        width: 320px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-shrink: 0;
+      }
+
+      #decor-strip-canvas {
+        background-color: #ffffff;
+        box-shadow: 0 12px 35px rgba(0, 0, 0, 0.3);
+        max-width: 100%;
+        cursor: crosshair;
+      }
+
+      .decor-menu-dashboard {
+        display: flex;
+        flex-direction: column;
+        width: 680px;
+        gap: 30px;
+      }
+
+      .decor-main-title-header {
+        width: 100%;
+        margin-bottom: 5px;
+      }
+
+      .decor-main-title-header img {
+        width: 480px;
+        height: auto;
+        display: block;
+      }
+
+      .decor-sections-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 35px;
+        width: 100%;
+      }
+
+      .decor-block-section {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        width: 100%;
+      }
+
+      .decor-asset-label-heading {
+        height: 25px;
+        width: auto;
+        object-fit: contain;
+        margin-bottom: 15px;
+      }
+
+      .circle-color-selection-grid {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 12px;
+        align-items: center;
+        width: 100%;
+      }
+
+      .preset-color-circle-btn {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.8);
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+        cursor: pointer;
+        transition: transform 0.15s ease;
+        flex-shrink: 0;
+      }
+
+      .preset-color-circle-btn:hover {
+        transform: scale(1.1);
+      }
+
+      .custom-color-wheel-circle {
+        position: relative;
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        overflow: hidden;
+        border: 2px solid white;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+        cursor: pointer;
+      }
+
+      #decor-color-wheel {
+        position: absolute;
+        top: -10px;
+        left: -10px;
+        width: 68px;
+        height: 68px;
+        cursor: pointer;
+        border: none;
+        background: none;
+        -webkitappearance: none;
+      }
+
+      .horizontal-button-options-layout {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        width: 100%;
+      }
+
+      .filter-action-btn,
+      .strip-template-btn {
+        width: 100%;
+        padding: 10px 12px;
+        background: rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        color: white;
+        font-family: Arial, sans-serif;
+        font-size: 12px;
+        font-weight: bold;
+        cursor: pointer;
+        border-radius: 20px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        transition: all 0.2s ease;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+      }
+
+      .filter-action-btn:hover,
+      .strip-template-btn:hover {
+        background: rgba(255, 255, 255, 0.35);
+      }
+
+      .filter-action-btn.active,
+      .strip-template-btn.active {
+        background: #0022ff;
+        border-color: #0022ff;
+        box-shadow: 0 0 10px rgba(0, 34, 255, 0.4);
+      }
+
+      .stickers-asset-square-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        width: 100%;
+      }
+
+      .sticker-box-asset-item {
+        background: rgba(255, 255, 255, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        aspect-ratio: 1 / 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 28px;
+        cursor: pointer;
+        user-select: none;
+        transition:
+          transform 0.1s ease,
+          background 0.2s;
+      }
+
+      .sticker-box-asset-item:hover {
+        transform: scale(1.05);
+        background: rgba(255, 255, 255, 0.25);
+      }
+
+      .decor-footer-action-panel {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        width: 100%;
+        margin-top: 10px;
+      }
+
+      .decor-master-continue-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        transition: transform 0.2s ease;
+      }
+
+      .decor-master-continue-btn:hover {
+        transform: scale(1.05);
+      }
+      .decor-master-continue-btn img {
+        width: 130px;
+        height: auto;
+        display: block;
+      }
+
+      .placeholder-design-box {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.7);
+        grid-column: span 2;
+        font-style: italic;
+        margin-top: 5px;
+      }
+
+      /* ==========================================
+       FINAL PAGE STYLE (PERFECT 3-COLUMN LAYOUT)
+       ========================================== */
+      #view-final {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: #82c4f5; /* Fallback */
+        background-image: url("assets/gboothbackground.jpg");
+        background-size: 100% 100%;
+        background-position: center;
+        background-repeat: no-repeat;
+        z-index: 1000; /* Covers the base logos completely */
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* Header Banner across the top */
+      .final-header-banner {
+        width: 70%;
+        height: 6%;
+        object-fit: fill;
+        display: block;
+        margin-top: 10px;
+      }
+
+      /* Countdown timer display box */
+      .final-timer-box {
+        position: absolute;
+        top: 14vh;
+        right: 4vw;
+        background: #000000;
+        border-radius: 10px;
+        padding: 8px 20px;
+        color: #2cff9f;
+        font-family: "Courier New", monospace;
+        font-size: 24px;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        z-index: 1010;
+      }
+
+      /* Main row splits the view into 3 columns */
+      .final-layout-row {
+        flex: 1;
+        display: flex;
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        padding: 0 8vw;
+        box-sizing: border-box;
+      }
+
+      /* Column container structures */
+      .final-column {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+      }
+
+      /* LEFT COLUMN: QR Code Section */
+      .final-qr-column {
+        width: 300px;
+      }
+
+      .qr-blue-box {
+        position: relative;
+        width: 250px;
+        height: 250px;
+        background-color: #8bbceb; /* Styled blue square container */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+      }
+
+      #qr-code {
+        width: 180px;
+        height: 180px;
+        background-color: #ffffff;
+        padding: 10px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      #qr-code img {
+        width: 100% !important;
+        height: 100% !important;
+      }
+
+      .qr-caption {
+        margin-top: 25px;
+        font-family: "Arial Black", "Cooper Black", sans-serif;
+        font-size: 20px;
+        color: #000000;
+        text-transform: uppercase;
+        text-align: center;
+      }
+
+      /* CENTER COLUMN: Photo Strip Preview */
+      .final-strip-column {
+        flex: 1;
+      }
+
+      #final-strip-canvas {
+        height: 65vh; /* Scale cleanly matching monitor size */
+        max-height: 750px;
+        width: auto;
+        background-color: #ffffff;
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.35);
+        border-radius: 4px;
+      }
+
+      /* RIGHT COLUMN: Control Panel */
+      .final-buttons-column {
+        width: 300px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: flex-end; /* Align cleanly to the outer edge */
+        gap: 40px; /* Neatly spaced vertically */
+      }
+
+      /* Clean circular buttons */
+      .circular-action-btn {
+        background: none !important;
+        border: none !important;
+        outline: none !important;
+        padding: 0 !important;
+        cursor: pointer;
+        width: 140px !important;
+        height: 140px !important;
+        transition: transform 0.2s ease;
+      }
+
+      .circular-action-btn img {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: contain;
+      }
+
+      .circular-action-btn:hover {
+        transform: scale(1.06);
+      }
+
+      .circular-action-btn:active {
+        transform: scale(0.95);
+      }
+
+      /* ==========================================
+       SPECIALIZED PRINT ENGINE STYLES
+       ========================================== */
+      #print-window-container {
+        display: block !important;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 2in !important;
+        height: 6in !important; /* Ensure the container takes full height */
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      @media print {
+        body,
+        html,
+        main,
+        .booth-container,
+        .view-panel {
+          display: none !important;
+        }
+
+        #print-window-container {
+          display: block !important;
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 2in !important;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+
+        @page {
+          size: 2in 6in;
+          margin: 0 !important;
+        }
+
+        .print-page-instance {
+          width: 2in !important;
+          height: 6in !important;
+          page-break-after: always;
+          break-after: page;
+          display: block;
+          margin: 0 !important;
+          padding: 0 !important;
+        }
+
+        .print-page-instance img {
+          width: 100% !important;
+          height: 100% !important;
+          object-fit: contain;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="booth-container">
+      <div class="logo-container" id="top-logos">
+        <img src="assets/icl logo.png" alt="ICL Logo" class="logo" />
+        <img src="assets/glogo.png" alt="G Logo" class="logo" />
+      </div>
+
+      <!-- HOME SECTION PANEL -->
+      <section id="view-home" class="view-panel">
+        <div class="feed-window">
+          <img
+            src="assets/homescrn frame.png"
+            alt="Screen Frame"
+            class="frame-overlay"
+          />
+          <video id="webcam" autoplay playsinline></video>
+        </div>
+        <button id="start-btn" class="start-button">
+          <img src="assets/strt-bttn.png" alt="Start Button Layout" />
+          <span class="button-text">START</span>
+        </button>
+        <div class="title-container">
+          <img src="assets/GBOOTH.png" alt="GBOOTH" class="gbooth-title" />
+        </div>
+      </section>
+
+      <!-- CHOOSE LAYOUT PANEL -->
+      <section id="view-layout" class="view-panel hidden">
+        <button class="back-btn" id="back-to-home">← Back</button>
+        <h2 class="layout-headline">Choose Your Layout</h2>
+        <p class="layout-subheadline">
+          How many memories do you want to secure today?
+        </p>
+        <div class="layout-grid-fullscreen">
+          <div class="layout-card" data-slots="2">
+            <div class="cut-btn">
+              <div class="visual-strip-mock slots-2">
+                <div class="mock-slot"></div>
+                <div class="mock-slot"></div>
+              </div>
+            </div>
+            <span class="layout-label">Duo Strip</span>
+            <span class="layout-sublabel">2 Captured Photos</span>
+          </div>
+          <div class="layout-card" data-slots="3">
+            <div class="cut-btn">
+              <div class="visual-strip-mock slots-3">
+                <div class="mock-slot"></div>
+                <div class="mock-slot"></div>
+                <div class="mock-slot"></div>
+              </div>
+            </div>
+            <span class="layout-label">Trio Strip</span>
+            <span class="layout-sublabel">3 Captured Photos</span>
+          </div>
+          <div class="layout-card" data-slots="4">
+            <div class="cut-btn">
+              <div class="visual-strip-mock slots-4">
+                <div class="mock-slot"></div>
+                <div class="mock-slot"></div>
+                <div class="mock-slot"></div>
+                <div class="mock-slot"></div>
+              </div>
+            </div>
+            <span class="layout-label">Classic 4-Pack</span>
+            <span class="layout-sublabel">4 Captured Photos</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- CAMERA STUDIO PANEL -->
+      <section id="view-camera" class="view-panel hidden">
+        <button class="back-btn" id="back-to-layout">← Back</button>
+        <div class="camera-workspace">
+          <div class="camera-viewfinder">
+            <video id="booth-cam-stream" autoplay playsinline></video>
+            <div id="countdown-overlay" class="hidden">3</div>
+          </div>
+          <div class="camera-sidebar">
+            <div id="photo-preview-grid"></div>
+            <div class="camera-action-controls">
+              <button id="retake-btn" class="cam-action-btn hidden">
+                <img src="assets/retake pic.png" alt="Retake All Shots" />
+              </button>
+              <button id="continue-btn" class="cam-action-btn hidden">
+                <img
+                  src="assets/continue button-2.png"
+                  alt="Proceed to Decoration Studio"
+                />
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- DECORATION WORKSPACE REDESIGN SCREEN -->
+      <section id="view-decor" class="view-panel hidden">
+        <button class="back-btn" id="back-to-camera">← Back</button>
+        <div
+          class="decor-workspace-grid"
+          style="gap: 70px; margin-top: 20px; align-items: center"
+        >
+          <div class="decor-strip-area">
+            <canvas id="decor-strip-canvas"></canvas>
+          </div>
+
+          <div class="decor-menu-dashboard" style="gap: 45px; width: 720px">
+            <div class="decor-main-title-header" style="margin-bottom: 10px">
+              <img
+                src="assets/decostrip2.png"
+                alt="CUSTOMIZE YOUR STRIP"
+                style="width: 620px; height: auto"
+              />
+            </div>
+
+            <div class="decor-sections-grid" style="gap: 45px 55px">
+              <!-- BLOCK 1: FRAME COLOR -->
+              <div class="decor-block-section" id="section-frame-color">
+                <img
+                  src="assets/FRAME COLOR2.png"
+                  alt="FRAME COLOR"
+                  class="decor-asset-label-heading"
+                />
+                <div
+                  class="circle-color-selection-grid"
+                  style="
+                    display: grid;
+                    grid-template-columns: repeat(5, 48px);
+                    gap: 16px 12px;
+                    width: 100%;
+                  "
+                >
+                  <button
+                    class="preset-color-circle-btn"
+                    data-color="#043371"
+                    style="
+                      background-color: #043371;
+                      border-radius: 50%;
+                      width: 48px;
+                      height: 48px;
+                      border: 2px solid white;
+                      cursor: pointer;
+                      grid-row: 1;
+                    "
+                  ></button>
+                  <button
+                    class="preset-color-circle-btn"
+                    data-color="#CC4E00"
+                    style="
+                      background-color: #cc4e00;
+                      border-radius: 50%;
+                      width: 48px;
+                      height: 48px;
+                      border: 2px solid white;
+                      cursor: pointer;
+                      grid-row: 1;
+                    "
+                  ></button>
+                  <button
+                    class="preset-color-circle-btn"
+                    data-color="#EB9AB2"
+                    style="
+                      background-color: #eb9ab2;
+                      border-radius: 50%;
+                      width: 48px;
+                      height: 48px;
+                      border: 2px solid white;
+                      cursor: pointer;
+                      grid-row: 1;
+                    "
+                  ></button>
+                  <button
+                    class="preset-color-circle-btn"
+                    data-color="#CDED76"
+                    style="
+                      background-color: #cded76;
+                      border-radius: 50%;
+                      width: 48px;
+                      height: 48px;
+                      border: 2px solid white;
+                      cursor: pointer;
+                      grid-row: 1;
+                    "
+                  ></button>
+                  <button
+                    class="preset-color-circle-btn"
+                    data-color="#AEA43A"
+                    style="
+                      background-color: #aea43a;
+                      border-radius: 50%;
+                      width: 48px;
+                      height: 48px;
+                      border: 2px solid white;
+                      cursor: pointer;
+                      grid-row: 1;
+                    "
+                  ></button>
+
+                  <div
+                    style="
+                      grid-row: 2;
+                      grid-column: span 5;
+                      display: flex;
+                      flex-direction: column;
+                      align-items: center;
+                      justify-content: center;
+                      gap: 6px;
+                      margin-top: 5px;
+                    "
+                  >
+                    <div
+                      class="custom-color-wheel-circle"
+                      style="
+                        position: relative;
+                        width: 48px;
+                        height: 48px;
+                        border-radius: 50%;
+                        overflow: hidden;
+                        border: 2px solid white;
+                        cursor: pointer;
+                      "
+                    >
+                      <input
+                        type="color"
+                        id="decor-color-wheel"
+                        value="#EB9AB2"
+                      />
+                    </div>
+                    <span
+                      style="
+                        color: white;
+                        font-family: Arial, sans-serif;
+                        font-size: 10px;
+                        font-weight: bold;
+                        letter-spacing: 0.5px;
+                        text-transform: uppercase;
+                        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+                        white-space: nowrap;
+                      "
+                      >pick your color</span
+                    >
+                  </div>
+                </div>
+              </div>
+
+              <!-- BLOCK 2: FILTERS -->
+              <div class="decor-block-section" id="section-filters">
+                <img
+                  src="assets/FILTERS2.png"
+                  alt="FILTERS"
+                  class="decor-asset-label-heading"
+                />
+                <div
+                  class="horizontal-button-options-layout"
+                  style="gap: 12px 10px"
+                >
+                  <button class="filter-action-btn active" data-filter="none">
+                    Original
+                  </button>
+                  <button class="filter-action-btn" data-filter="traditional">
+                    Traditional
+                  </button>
+                  <button class="filter-action-btn" data-filter="sepia">
+                    Sepia
+                  </button>
+                  <button class="filter-action-btn" data-filter="soft">
+                    Soft Light
+                  </button>
+                  <button class="filter-action-btn" data-filter="y2k">
+                    Y2K
+                  </button>
+                  <button class="filter-action-btn" data-filter="vivid">
+                    Vivid
+                  </button>
+                </div>
+              </div>
+
+              <!-- BLOCK 3: STICKERS -->
+              <div class="decor-block-section" id="section-stickers">
+                <img
+                  src="assets/STICKERS2.png"
+                  alt="STICKERS"
+                  class="decor-asset-label-heading"
+                />
+                <div class="stickers-asset-square-grid" style="gap: 14px">
+                  <div
+                    class="sticker-box-asset-item draggable-emoji-source"
+                    draggable="true"
+                    data-img="assets2/Stickers/bulletmaskot.png"
+                  >
+                    <img
+                      src="assets2/Stickers/bulletmaskot.png"
+                      style="width: 85%; height: 85%; object-fit: contain"
+                    />
+                  </div>
+                  <div
+                    class="sticker-box-asset-item draggable-emoji-source"
+                    draggable="true"
+                    data-img="assets2/Stickers/dogreatwork glasses.png"
+                  >
+                    <img
+                      src="assets2/Stickers/dogreatwork glasses.png"
+                      style="width: 100%; height: 100%; object-fit: contain"
+                    />
+                  </div>
+                  <div
+                    class="sticker-box-asset-item draggable-emoji-source"
+                    draggable="true"
+                    data-img="assets2/Stickers/Glogo.png"
+                  >
+                    <img
+                      src="assets2/Stickers/Glogo.png"
+                      style="width: 85%; height: 85%; object-fit: contain"
+                    />
+                  </div>
+                  <div
+                    class="sticker-box-asset-item draggable-emoji-source"
+                    draggable="true"
+                    data-img="assets2/Stickers/icl logo sticker.png"
+                  >
+                    <img
+                      src="assets2/Stickers/icl logo sticker.png"
+                      style="width: 85%; height: 85%; object-fit: contain"
+                    />
+                  </div>
+                  <!-- Cleaned text fallbacks to prevent errors if clicked/dragged -->
+                  <div
+                    class="sticker-box-asset-item draggable-emoji-source"
+                    draggable="true"
+                    data-img="🕶️"
+                  >
+                    🕶️
+                  </div>
+                  <div
+                    class="sticker-box-asset-item draggable-emoji-source"
+                    draggable="true"
+                    data-img="👑"
+                  >
+                    👑
+                  </div>
+                  <div
+                    class="sticker-box-asset-item draggable-emoji-source"
+                    draggable="true"
+                    data-img="🐈"
+                  >
+                    🐈
+                  </div>
+                  <div
+                    class="sticker-box-asset-item draggable-emoji-source"
+                    draggable="true"
+                    data-img="🍒"
+                  >
+                    🍒
+                  </div>
+                </div>
+              </div>
+
+              <!-- BLOCK 4: STRIP BACKGROUND -->
+              <div class="decor-block-section" id="section-strips">
+                <img
+                  src="assets/STRIPS2.png"
+                  alt="STRIPS"
+                  class="decor-asset-label-heading"
+                />
+                <div class="horizontal-button-options-layout">
+                  <button
+                    class="strip-template-btn active"
+                    data-template="default"
+                  >
+                    Plain Clean
+                  </button>
+                  <!-- YOUR NEW POLKADOT TRIAL BUTTON -->
+                  <button class="strip-template-btn" data-template="polkadot">
+                    Polkadot
+                  </button>
+                  <div class="placeholder-design-box">
+                    Custom themes coming soon!
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div
+              class="decor-footer-action-panel"
+              style="margin-top: 15px; padding-right: 40px"
+            >
+              <button
+                id="decor-master-submit-btn"
+                class="decor-master-continue-btn"
+                style="transform: scale(1.15)"
+              >
+                <img src="assets/continue button-2.png" alt="Continue" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PERFECT 3-COLUMN FINAL PAGE SECTION -->
+      <section id="view-final" class="view-panel hidden">
+        <!-- Header Banner -->
+        <img
+          src="assets/HERE IS YOUR STRIP!.png"
+          class="final-header-banner"
+          alt="Here is your strip!"
+        />
+
+        <!-- Top Right Timer -->
+        <div class="final-timer-box">
+          TIME: <span id="final-countdown">30</span>
+        </div>
+
+        <!-- Main Layout Split into 3 Perfect Columns -->
+        <div class="final-layout-row">
+          <!-- LEFT COLUMN: Custom QR Code Window -->
+          <div class="final-column final-qr-column">
+            <div class="qr-blue-box">
+              <div id="qr-code"></div>
+            </div>
+            <h2 class="qr-caption">DOWNLOAD YOUR STRIP!</h2>
+          </div>
+
+          <!-- CENTER COLUMN: Canvas Strip -->
+          <div class="final-column final-strip-column">
+            <canvas id="final-strip-canvas"></canvas>
+          </div>
+
+          <!-- RIGHT COLUMN: Control Buttons -->
+          <div class="final-column final-buttons-column">
+            <!-- Centered Print Button -->
+            <button id="print-btn" class="circular-action-btn">
+              <img src="assets/print button.png" alt="Print" />
+            </button>
+
+            <!-- Home Button -->
+            <button id="home-btn" class="circular-action-btn">
+              <img src="assets/Group 82.png" alt="Back to Start" />
+            </button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Clean Offscreen Duplicated Container Reserved exclusively for Page Spooling -->
+    <div id="print-window-container"></div>
+
+    <script src="newjava.js"></script>
+  </body>
+</html>
